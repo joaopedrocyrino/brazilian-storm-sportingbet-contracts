@@ -4,8 +4,10 @@ pragma solidity ^0.8.4;
 import "@zk-kit/incremental-merkle-tree.sol/contracts/IncrementalBinaryTree.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
-import "./MerkleTreeInclusionVerifier.sol";
-import "./DepositVerifier.sol";
+import "./interfaces/IMerkleTreeInclusionVerifier.sol";
+import "./interfaces/IDepositVerifier.sol";
+import "./interfaces/ICreateUserVerifier.sol";
+import {PoseidonT2} from "./Poseidon.sol";
 
 contract BrazilianStormSportingbet {
     using IncrementalBinaryTree for IncrementalTreeData;
@@ -30,16 +32,26 @@ contract BrazilianStormSportingbet {
     address private owner;
 
     IncrementalTreeData public users;
-    DepositVerifier public depositVerifier;
-    MerkleTreeInclusionVerifier public merkleTreeInclusionVerifier;
+
+    IDepositVerifier public depositVerifier;
+    IMerkleTreeInclusionVerifier public merkleTreeInclusionVerifier;
+    ICreateUserVerifier public createUserVerifier;
 
     mapping(uint256 => bool) public usernames;
     mapping(uint256 => uint256) public balances;
     mapping(uint256 => uint256) public treeIndex;
 
-    constructor(address _depositVerifier, address _merkleTreeVerifier, uint8 depth) {
-        depositVerifier = DepositVerifier(_depositVerifier);
-        merkleTreeInclusionVerifier = MerkleTreeInclusionVerifier(_merkleTreeVerifier);
+    constructor(
+        address _depositVerifier,
+        address _merkleTreeVerifier,
+        address _createUserVerifier,
+        uint8 depth
+    ) {
+        createUserVerifier = ICreateUserVerifier(_createUserVerifier);
+        depositVerifier = IDepositVerifier(_depositVerifier);
+        merkleTreeInclusionVerifier = IMerkleTreeInclusionVerifier(
+            _merkleTreeVerifier
+        );
 
         users.init(depth, 0);
 
@@ -49,14 +61,49 @@ contract BrazilianStormSportingbet {
     event UserCreated(uint256 identityCommitment, uint256 root);
     event UserDeleted(uint256 identityCommitment, uint256 root);
 
-    function createUser(uint256 username, uint256 identityCommitment) external {
+    function isUser(
+        uint256[2] memory a,
+        uint256[2][2] memory b,
+        uint256[2] memory c,
+        uint256[2] memory input
+    ) internal view returns (uint256) {
+        bool isIncluded = merkleTreeInclusionVerifier.verifyProof(
+            a,
+            b,
+            c,
+            input
+        );
+
+        require(isIncluded && input[0] == users.root, "Not authorized");
+
+        return input[1];
+    }
+
+    function createUser(
+        uint256 username,
+        uint256[2] memory a,
+        uint256[2][2] memory b,
+        uint256[2] memory c,
+        uint256[2] memory input
+    ) external {
         require(!usernames[username], "Username is taken");
 
-        users.insert(identityCommitment);
+        uint256 leafIndex = users.numberOfLeaves;
+
+        bool isVerified = createUserVerifier.verifyProof(a, b, c, input);
+
+        require(isVerified, "Invalid proof");
+
+        users.insert(input[0]);
+
+        usernames[username] = true;
+        treeIndex[input[0]] = leafIndex;
+
+        balances[input[0]] = input[1];
 
         uint256 newRoot = users.root;
 
-        emit UserCreated(identityCommitment, newRoot);
+        emit UserCreated(input[0], newRoot);
     }
 
     function deposit(
@@ -69,14 +116,12 @@ contract BrazilianStormSportingbet {
         uint256[2] memory depositC,
         uint256[4] memory depositInput
     ) external payable {
-        bool isIncluded = merkleTreeInclusionVerifier.verifyProof(
+        uint256 identityCommitment = isUser(
             merkleA,
             merkleB,
             merkleC,
             merkleInput
         );
-
-        require(isIncluded && input[0] == users.root, "Not authorized");
 
         bool isValidDeposit = depositVerifier.verifyProof(
             depositA,
@@ -84,9 +129,15 @@ contract BrazilianStormSportingbet {
             depositC,
             depositInput
         );
-        
-        require(isValidDeposit && balances[depositInput[0]] == depositInput[1] && msg.value == depositInput[3], "Invalid deposit");
 
-        balances[depositInput[0]] = depositInput[2];
+        require(
+            isValidDeposit &&
+                identityCommitment == depositInput[0] &&
+                balances[identityCommitment] == depositInput[1] &&
+                msg.value == depositInput[3],
+            "Invalid deposit"
+        );
+
+        balances[identityCommitment] = depositInput[2];
     }
 }

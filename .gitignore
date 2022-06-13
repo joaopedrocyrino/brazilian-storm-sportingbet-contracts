@@ -11,4 +11,5 @@ artifacts
 *.ptau
 
 circuits/MerkleTree
-circuits/Deposit
+circuits/DepositProof
+circuits/CreateUser

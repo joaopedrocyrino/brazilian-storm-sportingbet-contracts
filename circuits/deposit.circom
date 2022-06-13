@@ -1,30 +1,42 @@
 pragma circom 2.0.0;
 
 include "../node_modules/circomlib/circuits/poseidon.circom";
+include "../node_modules/circomlib/circuits/mimc.circom";
 
 template Deposit() {
-    signal input identityCommitment;
+    signal input identity;
     signal input currentBalnace;
     signal input value;
 
-    signal output hashs[3];
+    signal output identityCommitment;
+    signal output encryptedCurrentBalance;
+    signal output encryptedNewBalance;
+
     signal newBalance;
 
     newBalance <== value + currentBalnace;
 
-    component hashers[3];
+    component poseidon = Poseidon(1);
 
-    for (var i = 0; i < 3; i++) {
-        hashers[i] = Poseidon(1);
-    }
+    poseidon.inputs[0] <== identity;
 
-    hashers[0].inputs[0] <== identityCommitment;
-    hashers[1].inputs[0] <== currentBalnace;
-    hashers[2].inputs[0] <== newBalance;
+    identityCommitment <== poseidon.out;
 
-    for (var i = 0; i < 3; i++) {
-        hashs[i] <== hashers[i].out;
-    }
+    component mimc[2];
+
+    mimc[0] = MiMC7(90);
+
+    mimc[0].x_in <== currentBalnace;
+    mimc[0].k <== identity;
+
+    encryptedCurrentBalance <== mimc[0].out;
+
+    mimc[1] = MiMC7(90);
+
+    mimc[1].x_in <== newBalance;
+    mimc[1].k <== identity;
+
+    encryptedNewBalance <== mimc[0].out;
 }
 
 component main {public [value]} = Deposit();

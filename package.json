@@ -4,8 +4,6 @@
     "@nomiclabs/hardhat-ethers": "^2.0.6",
     "@nomiclabs/hardhat-etherscan": "^3.0.4",
     "@nomiclabs/hardhat-waffle": "^2.0.3",
-    "@semaphore-protocol/identity": "^0.2.2",
-    "@semaphore-protocol/proof": "^0.2.2",
     "@typechain/ethers-v5": "^7.2.0",
     "@typechain/hardhat": "^2.3.1",
     "@types/chai": "^4.3.1",
@@ -40,7 +38,6 @@
   "dependencies": {
     "@chainlink/contracts": "^0.4.1",
     "@openzeppelin/contracts": "^4.6.0",
-    "@semaphore-protocol/contracts": "^0.2.0",
     "@zk-kit/incremental-merkle-tree.sol": "^0.3.1"
   },
   "scripts": {

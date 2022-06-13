@@ -5,7 +5,11 @@ const verifierRegex = /contract Verifier/;
 
 // const verifyProofRegex = /function verifyProof/;
 
-const contracts = ["MerkleTreeInclusionVerifier", "DepositVerifier"];
+const contracts = [
+  "MerkleTreeInclusionVerifier",
+  "DepositVerifier",
+  "CreateUserVerifier",
+];
 
 contracts.forEach((e) => {
   const content = fs.readFileSync(`./contracts/${e}.sol`, {
