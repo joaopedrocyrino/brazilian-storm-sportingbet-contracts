@@ -7,7 +7,8 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "./interfaces/IMerkleTreeInclusionVerifier.sol";
 import "./interfaces/IDepositVerifier.sol";
 import "./interfaces/ICreateUserVerifier.sol";
-import {PoseidonT2} from "./Poseidon.sol";
+import "./interfaces/IWithdrawnVerifier.sol";
+// import {PoseidonT2} from "./Poseidon.sol";
 
 contract BrazilianStormSportingbet {
     using IncrementalBinaryTree for IncrementalTreeData;
@@ -36,6 +37,7 @@ contract BrazilianStormSportingbet {
     IDepositVerifier public depositVerifier;
     IMerkleTreeInclusionVerifier public merkleTreeInclusionVerifier;
     ICreateUserVerifier public createUserVerifier;
+    IWithdrawnVerifier public withdrawnVerifier;
 
     mapping(uint256 => bool) public usernames;
     mapping(uint256 => uint256) public balances;
@@ -45,10 +47,12 @@ contract BrazilianStormSportingbet {
         address _depositVerifier,
         address _merkleTreeVerifier,
         address _createUserVerifier,
+        address _withdrawnVerifier,
         uint8 depth
     ) {
         createUserVerifier = ICreateUserVerifier(_createUserVerifier);
         depositVerifier = IDepositVerifier(_depositVerifier);
+        withdrawnVerifier = IWithdrawnVerifier(_withdrawnVerifier);
         merkleTreeInclusionVerifier = IMerkleTreeInclusionVerifier(
             _merkleTreeVerifier
         );
@@ -139,5 +143,41 @@ contract BrazilianStormSportingbet {
         );
 
         balances[identityCommitment] = depositInput[2];
+    }
+
+    function withdrawn(
+        uint256[2] memory merkleA,
+        uint256[2][2] memory merkleB,
+        uint256[2] memory merkleC,
+        uint256[2] memory merkleInput,
+        uint256[2] memory withdrawnA,
+        uint256[2][2] memory withdrawnB,
+        uint256[2] memory withdrawnC,
+        uint256[4] memory withdrawnInput,
+        uint256 withdrawnValue
+    ) external payable {
+        uint256 identityCommitment = isUser(
+            merkleA,
+            merkleB,
+            merkleC,
+            merkleInput
+        );
+
+        bool isValidWithdrawn = withdrawnVerifier.verifyProof(
+            withdrawnA,
+            withdrawnB,
+            withdrawnC,
+            withdrawnInput
+        );
+
+        require(
+            isValidWithdrawn &&
+                identityCommitment == withdrawnInput[0] &&
+                balances[identityCommitment] == withdrawnInput[1] &&
+                withdrawnValue == withdrawnInput[3],
+            "Invalid withdrawn"
+        );
+
+        balances[identityCommitment] = withdrawnInput[2];
     }
 }

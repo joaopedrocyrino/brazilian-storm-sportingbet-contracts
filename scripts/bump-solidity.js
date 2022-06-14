@@ -9,6 +9,7 @@ const contracts = [
   "MerkleTreeInclusionVerifier",
   "DepositVerifier",
   "CreateUserVerifier",
+  "WithdrawnVerifier",
 ];
 
 contracts.forEach((e) => {
