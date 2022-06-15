@@ -8,7 +8,6 @@ import "./interfaces/IMerkleTreeInclusionVerifier.sol";
 import "./interfaces/IDepositVerifier.sol";
 import "./interfaces/ICreateUserVerifier.sol";
 import "./interfaces/IWithdrawnVerifier.sol";
-// import {PoseidonT2} from "./Poseidon.sol";
 
 contract BrazilianStormSportingbet {
     using IncrementalBinaryTree for IncrementalTreeData;
@@ -29,8 +28,6 @@ contract BrazilianStormSportingbet {
         bool win;
         uint256 value;
     }
-
-    address private owner;
 
     IncrementalTreeData public users;
 
@@ -58,8 +55,6 @@ contract BrazilianStormSportingbet {
         );
 
         users.init(depth, 0);
-
-        owner = msg.sender;
     }
 
     event UserCreated(uint256 identityCommitment, uint256 root);
@@ -179,5 +174,7 @@ contract BrazilianStormSportingbet {
         );
 
         balances[identityCommitment] = withdrawnInput[2];
+
+        payable(msg.sender).transfer(withdrawnValue);
     }
 }

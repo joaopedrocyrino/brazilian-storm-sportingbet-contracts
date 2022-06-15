@@ -1,29 +1,94 @@
-// We require the Hardhat Runtime Environment explicitly here. This is optional
-// but useful for running the script in a standalone fashion through `node <script>`.
-//
-// When running the script with `npx hardhat run <script>` you'll find the Hardhat
-// Runtime Environment's members available in the global scope.
 import { ethers } from "hardhat";
+const { poseidonContract } = require("circomlibjs");
 
 async function main() {
-  // Hardhat always runs the compile task when running scripts with its command
-  // line interface.
-  //
-  // If this script is run directly using `node` you may want to call compile
-  // manually to make sure everything is compiled
-  // await hre.run('compile');
+  const DepositVerifier = await ethers.getContractFactory("DepositVerifier");
+  const depositVerifier = await DepositVerifier.deploy();
 
-  // We get the contract to deploy
-  const Greeter = await ethers.getContractFactory("Greeter");
-  const greeter = await Greeter.deploy("Hello, Hardhat!");
+  await depositVerifier.deployed();
 
-  await greeter.deployed();
+  console.log("\nDeposit Verifier deployed to:", depositVerifier.address);
 
-  console.log("Greeter deployed to:", greeter.address);
+  const MerkleTreeInclusionVerifier = await ethers.getContractFactory(
+    "MerkleTreeInclusionVerifier"
+  );
+  const merkleTreeInclusionVerifier =
+    await MerkleTreeInclusionVerifier.deploy();
+
+  await merkleTreeInclusionVerifier.deployed();
+
+  console.log(
+    "\nMerkle Tree Inclusion Verifier deployed to:",
+    merkleTreeInclusionVerifier.address
+  );
+
+  const CreateUserVerifier = await ethers.getContractFactory(
+    "CreateUserVerifier"
+  );
+  const createUserVerifier = await CreateUserVerifier.deploy();
+
+  await createUserVerifier.deployed();
+
+  console.log("\nCreateUser Verifier deployed to:", createUserVerifier.address);
+
+  const WithdrawnVerifier = await ethers.getContractFactory(
+    "WithdrawnVerifier"
+  );
+  const withdrawnVerifier = await WithdrawnVerifier.deploy();
+
+  await withdrawnVerifier.deployed();
+
+  console.log("\nWithdrawn Verifier deployed to:", withdrawnVerifier.address);
+
+  const PoseidonT3 = await ethers.getContractFactory(
+    poseidonContract.generateABI(2),
+    poseidonContract.createCode(2)
+  );
+  const poseidonT3 = await PoseidonT3.deploy();
+  await poseidonT3.deployed();
+
+  console.log("\nPoseidonT3 deployed to:", poseidonT3.address);
+
+  const IncrementalBinaryTree = await ethers.getContractFactory(
+    "IncrementalBinaryTree",
+    {
+      libraries: {
+        PoseidonT3: poseidonT3.address,
+      },
+    }
+  );
+  const incrementalBinaryTree = await IncrementalBinaryTree.deploy();
+  await incrementalBinaryTree.deployed();
+
+  console.log(
+    "\nIncremental Binary Tree deployed to:",
+    incrementalBinaryTree.address
+  );
+
+  const BrazilianStormSportingbet = await ethers.getContractFactory(
+    "BrazilianStormSportingbet",
+    {
+      libraries: {
+        IncrementalBinaryTree: incrementalBinaryTree.address,
+      },
+    }
+  );
+  const brazilianStormSportingbet = await BrazilianStormSportingbet.deploy(
+    depositVerifier.address,
+    merkleTreeInclusionVerifier.address,
+    createUserVerifier.address,
+    withdrawnVerifier.address,
+    32
+  );
+
+  await brazilianStormSportingbet.deployed();
+
+  console.log(
+    "\nBrazilian Storm Sportingbet deployed to:",
+    brazilianStormSportingbet.address
+  );
 }
 
-// We recommend this pattern to be able to use async/await everywhere
-// and properly handle errors.
 main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
