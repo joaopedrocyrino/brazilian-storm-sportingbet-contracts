@@ -13,20 +13,33 @@ contract BrazilianStormSportingbet {
     using IncrementalBinaryTree for IncrementalTreeData;
     using Counters for Counters.Counter;
 
-    struct BetOption {
+    struct WinnerBet {
         uint256 id;
-        bool open;
-        string title;
-        string description;
-        uint256 returnValue;
+        bool houseWins;
+        uint256 better;
+        uint256 value;
+        uint8 round;
+        uint16 season;
     }
 
-    struct Bet {
+    struct GoalsBet {
         uint256 id;
-        uint256 betOptionId;
-        bool finished;
-        bool win;
+        bool house;
+        uint256 better;
         uint256 value;
+        uint8 round;
+        uint16 season;
+        uint8 goals;
+    }
+
+    struct ScoreBet {
+        uint256 id;
+        uint8 house;
+        uint8 visitor;
+        uint256 better;
+        uint256 value;
+        uint8 round;
+        uint16 season;
     }
 
     IncrementalTreeData public users;
@@ -39,6 +52,7 @@ contract BrazilianStormSportingbet {
     mapping(uint256 => bool) public usernames;
     mapping(uint256 => uint256) public balances;
     mapping(uint256 => uint256) public treeIndex;
+    mapping(uint256 => mapping(uint256 => WinnerBet)) winnerBets;
 
     constructor(
         address _depositVerifier,
