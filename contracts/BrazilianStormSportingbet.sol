@@ -120,75 +120,41 @@ contract BrazilianStormSportingbet {
     }
 
     function deposit(
-        uint256[2] memory merkleA,
-        uint256[2][2] memory merkleB,
-        uint256[2] memory merkleC,
-        uint256[2] memory merkleInput,
-        uint256[2] memory depositA,
-        uint256[2][2] memory depositB,
-        uint256[2] memory depositC,
-        uint256[4] memory depositInput
+        uint256[2] memory a,
+        uint256[2][2] memory b,
+        uint256[2] memory c,
+        uint256[5] memory input
     ) external payable {
-        uint256 identityCommitment = isUser(
-            merkleA,
-            merkleB,
-            merkleC,
-            merkleInput
-        );
-
-        bool isValidDeposit = depositVerifier.verifyProof(
-            depositA,
-            depositB,
-            depositC,
-            depositInput
-        );
+        bool isValidDeposit = depositVerifier.verifyProof(a, b, c, input);
 
         require(
             isValidDeposit &&
-                identityCommitment == depositInput[0] &&
-                balances[identityCommitment] == depositInput[1] &&
-                msg.value == depositInput[3],
+                balances[input[0]] == input[2] &&
+                input[1] == users.root &&
+                msg.value == input[4],
             "Invalid deposit"
         );
 
-        balances[identityCommitment] = depositInput[2];
+        balances[input[0]] = input[3];
     }
 
     function withdrawn(
-        uint256[2] memory merkleA,
-        uint256[2][2] memory merkleB,
-        uint256[2] memory merkleC,
-        uint256[2] memory merkleInput,
-        uint256[2] memory withdrawnA,
-        uint256[2][2] memory withdrawnB,
-        uint256[2] memory withdrawnC,
-        uint256[4] memory withdrawnInput,
-        uint256 withdrawnValue
+        uint256[2] memory a,
+        uint256[2][2] memory b,
+        uint256[2] memory c,
+        uint256[5] memory input
     ) external payable {
-        uint256 identityCommitment = isUser(
-            merkleA,
-            merkleB,
-            merkleC,
-            merkleInput
-        );
-
-        bool isValidWithdrawn = withdrawnVerifier.verifyProof(
-            withdrawnA,
-            withdrawnB,
-            withdrawnC,
-            withdrawnInput
-        );
+        bool isValidWithdrawn = withdrawnVerifier.verifyProof(a, b, c, input);
 
         require(
             isValidWithdrawn &&
-                identityCommitment == withdrawnInput[0] &&
-                balances[identityCommitment] == withdrawnInput[1] &&
-                withdrawnValue == withdrawnInput[3],
+                balances[input[0]] == input[2] &&
+                input[1] == users.root,
             "Invalid withdrawn"
         );
 
-        balances[identityCommitment] = withdrawnInput[2];
+        balances[input[0]] = input[3];
 
-        payable(msg.sender).transfer(withdrawnValue);
+        payable(msg.sender).transfer(input[4]);
     }
 }

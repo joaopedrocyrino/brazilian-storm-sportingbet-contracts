@@ -2,7 +2,7 @@ pragma circom 2.0.0;
 
 include "../../node_modules/circomlib/circuits/mimc.circom";
 include "../../node_modules/circomlib/circuits/comparators.circom";
-include "./merkleTree.circom"
+include "./merkleTree.circom";
 
 template Deposit(n) {
     signal input identity;
