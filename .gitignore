@@ -10,7 +10,8 @@ artifacts
 
 *.ptau
 
-circuits/MerkleTree
 circuits/DepositProof
 circuits/CreateUser
 circuits/Withdrawn
+circuits/ClaimBet
+circuits/MakeBet

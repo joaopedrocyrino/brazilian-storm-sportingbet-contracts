@@ -2,50 +2,39 @@ pragma circom 2.0.0;
 
 include "../../node_modules/circomlib/circuits/mimc.circom";
 include "../../node_modules/circomlib/circuits/comparators.circom";
+include "../../node_modules/circomlib/circuits/poseidon.circom";
 include "./merkleTree.circom";
 
-template Deposit(n) {
+template Deposit() {
     signal input identity;
-    signal input pathElements[n];
-    signal input pathIndex[n];
-    signal input currentBalnace;
+    signal input currentBalance;
     signal input value;
 
     signal output identityCommitment;
-    signal output root;
     signal output encryptedCurrentBalance;
     signal output encryptedNewBalance;
 
     signal newBalance;
 
-    newBalance <== value + currentBalnace;
+    newBalance <== value + currentBalance;
 
-    component balanceChange = BalanceChange(n);
+    component balanceChange = BalanceChange();
 
     balanceChange.identity <== identity;
-    balanceChange.currentBalnace <== currentBalnace;
+    balanceChange.currentBalance <== currentBalance;
     balanceChange.newBalance <== newBalance;
 
-    for (var i = 0; i < n; i++) {
-       balanceChange.pathElements[i] <== pathElements[i];
-       balanceChange.pathIndex[i] <== pathIndex[i];
-    }
-
     identityCommitment <== balanceChange.identityCommitment;
-    root <== balanceChange.root;
     encryptedCurrentBalance <== balanceChange.encryptedCurrentBalance;
     encryptedNewBalance <== balanceChange.encryptedNewBalance;
 }
 
-template Withdrawn(n) {
+template Withdrawn() {
     signal input identity;
-    signal input pathElements[n];
-    signal input pathIndex[n];
-    signal input currentBalnace;
+    signal input currentBalance;
     signal input value;
 
     signal output identityCommitment;
-    signal output root;
     signal output encryptedCurrentBalance;
     signal output encryptedNewBalance;
 
@@ -54,58 +43,119 @@ template Withdrawn(n) {
     component lessEqThan = LessEqThan(128);
 
     lessEqThan.in[0] <== value;
-    lessEqThan.in[1] <== currentBalnace;
+    lessEqThan.in[1] <== currentBalance;
 
     lessEqThan.out === 1;
 
-    newBalance <== currentBalnace - value;
+    newBalance <== currentBalance - value;
 
-    component balanceChange = BalanceChange(n);
+    component balanceChange = BalanceChange();
 
     balanceChange.identity <== identity;
-    balanceChange.currentBalnace <== currentBalnace;
+    balanceChange.currentBalance <== currentBalance;
     balanceChange.newBalance <== newBalance;
 
-    for (var i = 0; i < n; i++) {
-       balanceChange.pathElements[i] <== pathElements[i];
-       balanceChange.pathIndex[i] <== pathIndex[i];
-    }
-
     identityCommitment <== balanceChange.identityCommitment;
-    root <== balanceChange.root;
     encryptedCurrentBalance <== balanceChange.encryptedCurrentBalance;
     encryptedNewBalance <== balanceChange.encryptedNewBalance;
 }
 
-template BalanceChange(n) {
+template ClaimBetWin() {
     signal input identity;
-    signal input pathElements[n];
-    signal input pathIndex[n];
-    signal input currentBalnace;
+    signal input currentBalance;
+    signal input value;
+    signal input sharedSecret;
+    signal input rate;
+
+    signal output identityCommitment;
+    signal output encryptedCurrentBalance;
+    signal output encryptedNewBalance;
+    signal output encryptedBetValue;
+
+    signal newBalance;
+    signal winValue;
+
+    winValue <== value * rate;
+
+    newBalance <== currentBalance + winValue;
+
+    component balanceChange = BalanceChange();
+
+    balanceChange.identity <== identity;
+    balanceChange.currentBalance <== currentBalance;
+    balanceChange.newBalance <== newBalance;
+
+    identityCommitment <== balanceChange.identityCommitment;
+    encryptedCurrentBalance <== balanceChange.encryptedCurrentBalance;
+    encryptedNewBalance <== balanceChange.encryptedNewBalance;
+
+    component mimc = MiMC7(90);
+
+    mimc.x_in <== value;
+    mimc.k <== sharedSecret;
+
+    encryptedBetValue <== mimc.out;
+}
+
+template MakeBet() {
+    signal input identity;
+    signal input currentBalance;
+    signal input value;
+    signal input sharedSecret;
+
+    signal output identityCommitment;
+    signal output encryptedCurrentBalance;
+    signal output encryptedNewBalance;
+    signal output encryptedBetValue;
+
+    signal newBalance;
+
+    component lessEqThan = LessEqThan(128);
+
+    lessEqThan.in[0] <== value;
+    lessEqThan.in[1] <== currentBalance;
+
+    lessEqThan.out === 1;
+
+    newBalance <== currentBalance - value;
+
+    component balanceChange = BalanceChange();
+
+    balanceChange.identity <== identity;
+    balanceChange.currentBalance <== currentBalance;
+    balanceChange.newBalance <== newBalance;
+
+    identityCommitment <== balanceChange.identityCommitment;
+    encryptedCurrentBalance <== balanceChange.encryptedCurrentBalance;
+    encryptedNewBalance <== balanceChange.encryptedNewBalance;
+
+    component mimc = MiMC7(90);
+
+    mimc.x_in <== value;
+    mimc.k <== sharedSecret;
+
+    encryptedBetValue <== mimc.out;
+}
+
+template BalanceChange() {
+    signal input identity;
+    signal input currentBalance;
     signal input newBalance;
 
     signal output identityCommitment;
-    signal output root;
     signal output encryptedCurrentBalance;
     signal output encryptedNewBalance;
 
-    component merkleTreeInclusionProof = MerkleTreeInclusionProof(n);
+    component identityHasher = Poseidon(1);
+    identityHasher.inputs[0] <== identity;
 
-    merkleTreeInclusionProof.identity <== identity;
-
-    for (var i = 0; i < n; i++) {
-       merkleTreeInclusionProof.pathElements[i] <== pathElements[i];
-       merkleTreeInclusionProof.pathIndex[i] <== pathIndex[i];
-    }
-
-    identityCommitment <== merkleTreeInclusionProof.identityCommitment;
-    root <== merkleTreeInclusionProof.root;
+    identityCommitment <== identityHasher.out;
 
     component mimc[2];
 
     mimc[0] = MiMC7(90);
 
-    mimc[0].x_in <== currentBalnace;
+    mimc[0].x_in <== currentBalance;
     mimc[0].k <== identity;
 
     encryptedCurrentBalance <== mimc[0].out;

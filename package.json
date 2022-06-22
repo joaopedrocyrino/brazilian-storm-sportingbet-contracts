@@ -44,11 +44,11 @@
     "@zk-kit/incremental-merkle-tree.sol": "^0.3.1"
   },
   "scripts": {
-    "compile": "bash scripts/compile-circuits.sh && node scripts/bump-solidity.js",
+    "circuits": "bash scripts/compile-circuits.sh && node scripts/bump-solidity.js",
     "node": "ttab -t 'Local Node' npx hardhat node",
     "deploy-local": "npx hardhat run scripts/deploy.ts --network localhost",
     "local": "run-s node deploy-local",
-    "compile-local": "run-s compile node deploy-local"
+    "circuits-local": "run-s circuits node deploy-local"
   },
   "engines": {
     "node": ">=10.4.0"
