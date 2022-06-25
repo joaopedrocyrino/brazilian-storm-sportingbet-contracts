@@ -2,8 +2,9 @@ pragma circom 2.0.0;
 
 include "../node_modules/circomlib/circuits/poseidon.circom";
 include "../node_modules/circomlib/circuits/mimc.circom";
+include "./templates/encryption.circom";
 
-template CreateUser() {
+template CreateUser(n) {
     signal input username;
     signal input password;
 
@@ -19,23 +20,23 @@ template CreateUser() {
     component poseidon[2];
     
     poseidon[0] = Poseidon(1);
-
+    
     poseidon[0].inputs[0] <== poseidonT3.out;
 
     identityCommitment <== poseidon[0].out;
 
     poseidon[1] = Poseidon(1);
 
-    poseidon[1].inputs[0] <== identity;
+    poseidon[1].inputs[0] <== username;
 
     usernameCommitment <== poseidon[1].out;
 
-    component mimc = MiMC7(90);
+    component encrypt = Encrypt(n);
 
-    mimc.x_in <== 0;
-    mimc.k <== identity;
+    encrypt.secret <== poseidonT3.out;
+    encrypt.plaintext <== 0;
 
-    encryptedInitialBalance <== mimc.out;  
+    encryptedInitialBalance <== encrypt.out;  
 }
 
-component main = CreateUser();
+component main = CreateUser(5);

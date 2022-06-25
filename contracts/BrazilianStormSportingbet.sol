@@ -13,7 +13,7 @@ contract BrazilianStormSportingbet is Users, Bets {
     using Counters for Counters.Counter;
 
     address private coordinator;
-    uint256[133] public coordinatorPubKey;
+    uint8[32][2] public coordinatorPubKey;
 
     IMakeBetVerifier private betVerifier;
 
@@ -22,7 +22,8 @@ contract BrazilianStormSportingbet is Users, Bets {
         address _depositVerifier,
         address _withdrawnVerifier,
         address _betVerifier,
-        address _claimBetVerifier
+        address _claimBetVerifier,
+        uint8[32][2] memory _coordinatorPubKey
     )
         Users(_createUserVerifier, _depositVerifier, _withdrawnVerifier)
         Bets(_claimBetVerifier)
@@ -30,6 +31,7 @@ contract BrazilianStormSportingbet is Users, Bets {
         betVerifier = IMakeBetVerifier(_betVerifier);
 
         coordinator = msg.sender;
+        coordinatorPubKey = _coordinatorPubKey;
     }
 
     modifier onlyCoordinator() {

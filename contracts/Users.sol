@@ -10,7 +10,7 @@ contract Users {
         /// @dev user balance encrypted using user's identity
         uint256 balance;
         /// @dev used to generate shared secret between coordinator and user
-        uint256[133] pubKey;
+        uint8[32][2] pubKey;
         /// @dev used to check if user actually exists or if its default value
         bool isActive;
     }
@@ -38,14 +38,14 @@ contract Users {
         withdrawnVerifier = IWithdrawnVerifier(_withdrawnVerifier);
     }
 
-    event UserCreated(uint256 identityCommitment, uint256[133] pubKey);
+    event UserCreated(uint256 identityCommitment, uint8[32][2] pubKey);
 
     function createUser(
         uint256[2] memory a,
         uint256[2][2] memory b,
         uint256[2] memory c,
         uint256[3] memory input,
-        uint256[133] memory pubKey
+        uint8[32][2] memory pubKey
     ) external {
         bool isValidProof = createUserVerifier.verifyProof(a, b, c, input);
 

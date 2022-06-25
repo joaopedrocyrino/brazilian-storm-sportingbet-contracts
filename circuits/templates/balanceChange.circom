@@ -1,11 +1,10 @@
 pragma circom 2.0.0;
 
-include "../../node_modules/circomlib/circuits/mimc.circom";
 include "../../node_modules/circomlib/circuits/comparators.circom";
 include "../../node_modules/circomlib/circuits/poseidon.circom";
-include "./merkleTree.circom";
+include "./encryption.circom";
 
-template Deposit() {
+template Deposit(n) {
     signal input identity;
     signal input currentBalance;
     signal input value;
@@ -18,18 +17,19 @@ template Deposit() {
 
     newBalance <== value + currentBalance;
 
-    component balanceChange = BalanceChange();
+    component balanceChange = BalanceChange(n);
 
     balanceChange.identity <== identity;
     balanceChange.currentBalance <== currentBalance;
     balanceChange.newBalance <== newBalance;
 
     identityCommitment <== balanceChange.identityCommitment;
+
     encryptedCurrentBalance <== balanceChange.encryptedCurrentBalance;
     encryptedNewBalance <== balanceChange.encryptedNewBalance;
 }
 
-template Withdrawn() {
+template Withdrawn(n) {
     signal input identity;
     signal input currentBalance;
     signal input value;
@@ -40,7 +40,7 @@ template Withdrawn() {
 
     signal newBalance;
 
-    component lessEqThan = LessEqThan(128);
+    component lessEqThan = LessEqThan(252);
 
     lessEqThan.in[0] <== value;
     lessEqThan.in[1] <== currentBalance;
@@ -49,18 +49,19 @@ template Withdrawn() {
 
     newBalance <== currentBalance - value;
 
-    component balanceChange = BalanceChange();
+    component balanceChange = BalanceChange(n);
 
     balanceChange.identity <== identity;
     balanceChange.currentBalance <== currentBalance;
     balanceChange.newBalance <== newBalance;
 
     identityCommitment <== balanceChange.identityCommitment;
+
     encryptedCurrentBalance <== balanceChange.encryptedCurrentBalance;
     encryptedNewBalance <== balanceChange.encryptedNewBalance;
 }
 
-template ClaimBetWin() {
+template ClaimBetWin(n) {
     signal input identity;
     signal input currentBalance;
     signal input value;
@@ -75,29 +76,30 @@ template ClaimBetWin() {
     signal newBalance;
     signal winValue;
 
-    winValue <== value * rate;
+    winValue <== value * rate / 100;
 
     newBalance <== currentBalance + winValue;
 
-    component balanceChange = BalanceChange();
+    component balanceChange = BalanceChange(n);
 
     balanceChange.identity <== identity;
     balanceChange.currentBalance <== currentBalance;
     balanceChange.newBalance <== newBalance;
 
     identityCommitment <== balanceChange.identityCommitment;
+
     encryptedCurrentBalance <== balanceChange.encryptedCurrentBalance;
     encryptedNewBalance <== balanceChange.encryptedNewBalance;
 
-    component mimc = MiMC7(90);
+    component mimc = Encrypt(n);
 
-    mimc.x_in <== value;
-    mimc.k <== sharedSecret;
+    mimc.plaintext <== value;
+    mimc.secret <== sharedSecret;
 
     encryptedBetValue <== mimc.out;
 }
 
-template MakeBet() {
+template MakeBet(n) {
     signal input identity;
     signal input currentBalance;
     signal input value;
@@ -119,25 +121,26 @@ template MakeBet() {
 
     newBalance <== currentBalance - value;
 
-    component balanceChange = BalanceChange();
+    component balanceChange = BalanceChange(n);
 
     balanceChange.identity <== identity;
     balanceChange.currentBalance <== currentBalance;
     balanceChange.newBalance <== newBalance;
 
     identityCommitment <== balanceChange.identityCommitment;
+
     encryptedCurrentBalance <== balanceChange.encryptedCurrentBalance;
     encryptedNewBalance <== balanceChange.encryptedNewBalance;
 
-    component mimc = MiMC7(90);
+    component mimc = Encrypt(n);
 
-    mimc.x_in <== value;
-    mimc.k <== sharedSecret;
+    mimc.plaintext <== value;
+    mimc.secret <== sharedSecret;
 
     encryptedBetValue <== mimc.out;
 }
 
-template BalanceChange() {
+template BalanceChange(n) {
     signal input identity;
     signal input currentBalance;
     signal input newBalance;
@@ -153,17 +156,16 @@ template BalanceChange() {
 
     component mimc[2];
 
-    mimc[0] = MiMC7(90);
+    mimc[0] = Encrypt(n);
 
-    mimc[0].x_in <== currentBalance;
-    mimc[0].k <== identity;
+    mimc[0].plaintext <== currentBalance;
+    mimc[0].secret <== identity;
+
+    mimc[1] = Encrypt(n);
+
+    mimc[1].plaintext <== newBalance;
+    mimc[1].secret <== identity;
 
     encryptedCurrentBalance <== mimc[0].out;
-
-    mimc[1] = MiMC7(90);
-
-    mimc[1].x_in <== newBalance;
-    mimc[1].k <== identity;
-
-    encryptedNewBalance <== mimc[0].out;
+    encryptedNewBalance <== mimc[1].out;
 }

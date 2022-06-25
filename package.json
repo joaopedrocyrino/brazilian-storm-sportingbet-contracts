@@ -13,7 +13,7 @@
     "@typescript-eslint/parser": "^4.33.0",
     "chai": "^4.3.6",
     "circomlib": "^2.0.3",
-    "circomlibjs": "^0.1.2",
+    "circomlibjs": "^0.1.6",
     "dotenv": "^16.0.1",
     "eslint": "^7.32.0",
     "eslint-config-prettier": "^8.5.0",
@@ -41,7 +41,10 @@
     "@chainlink/contracts": "^0.4.1",
     "@openzeppelin/contracts": "^4.6.0",
     "@zk-kit/incremental-merkle-tree": "^0.4.3",
-    "@zk-kit/incremental-merkle-tree.sol": "^0.3.1"
+    "@zk-kit/incremental-merkle-tree.sol": "^0.3.1",
+    "blake-hash": "^2.0.0",
+    "circom_tester": "^0.0.14",
+    "ffjavascript": "^0.2.55"
   },
   "scripts": {
     "circuits": "bash scripts/compile-circuits.sh && node scripts/bump-solidity.js",
