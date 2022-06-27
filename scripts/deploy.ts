@@ -65,6 +65,88 @@ async function main() {
   );
   await brazilianStormContract.deployed();
 
+  const now = new Date().getTime();
+
+  await brazilianStormContract.createMatch(
+    15,
+    2022,
+    "JUV",
+    "CAM",
+    now + 604800
+  );
+
+  await brazilianStormContract.createMatch(
+    15,
+    2022,
+    "FLU",
+    "CTH",
+    now + 604800
+  );
+
+  await brazilianStormContract.createMatch(
+    15,
+    2022,
+    "SNT",
+    "FLA",
+    now + 604800
+  );
+
+  await brazilianStormContract.createMatch(
+    15,
+    2022,
+    "PAL",
+    "APR",
+    now + 604800
+  );
+
+  await brazilianStormContract.createMatch(
+    15,
+    2022,
+    "AGO",
+    "SAO",
+    now + 604800
+  );
+
+  await brazilianStormContract.createMatch(
+    15,
+    2022,
+    "COR",
+    "FOR",
+    now + 604800
+  );
+
+  await brazilianStormContract.createMatch(
+    15,
+    2022,
+    "CEA",
+    "INT",
+    now + 604800
+  );
+
+  await brazilianStormContract.createMatch(
+    15,
+    2022,
+    "AVA",
+    "CUI",
+    now + 604800
+  );
+
+  await brazilianStormContract.createMatch(
+    15,
+    2022,
+    "AMG",
+    "GOS",
+    now + 604800
+  );
+
+  await brazilianStormContract.createMatch(
+    15,
+    2022,
+    "BRG",
+    "BTF",
+    now + 604800
+  );
+
   console.log(
     "\nBrazilian Storm Sportingbet deployed to:",
     brazilianStormContract.address

@@ -102,10 +102,27 @@ contract Bets {
         MatchBets bets;
     }
 
+    struct MatchFields {
+        uint256 id;
+        /// @dev round of the season (up to 38)
+        uint8 round;
+        /// @dev season (year)
+        uint16 season;
+        /// @dev name of house team
+        string house;
+        /// @dev name of visitor team
+        string visitor;
+        /// @dev the limit time a user can bet on this match
+        uint256 limitTime;
+        /// @dev true if values were posted by the coordinator
+        bool closed;
+    }
+
     /// @dev match id => Match
     mapping(uint256 => Match) internal matches;
 
     Counters.Counter public _matchIds;
+    uint256 public firstOpenIndex;
 
     IClaimBetVerifier private claimBetVerifier;
 
@@ -161,5 +178,22 @@ contract Bets {
             soccerMatch.limitTime,
             soccerMatch.closed
         );
+    }
+
+    function getMatches() external view returns (MatchFields[] memory) {
+        MatchFields[] memory openMatches = new MatchFields[](
+            _matchIds.current() - firstOpenIndex
+        );
+
+        for (uint256 i = firstOpenIndex; i < _matchIds.current(); i++) {
+            openMatches[i - firstOpenIndex].id = matches[i].id;
+            openMatches[i - firstOpenIndex].round = matches[i].round;
+            openMatches[i - firstOpenIndex].season = matches[i].season;
+            openMatches[i - firstOpenIndex].house = matches[i].house;
+            openMatches[i - firstOpenIndex].visitor = matches[i].visitor;
+            openMatches[i - firstOpenIndex].limitTime = matches[i].limitTime;
+        }
+
+        return openMatches;
     }
 }
