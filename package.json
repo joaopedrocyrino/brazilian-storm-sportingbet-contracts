@@ -50,6 +50,7 @@
     "circuits": "bash scripts/compile-circuits.sh && node scripts/bump-solidity.js",
     "node": "ttab -t 'Local Node' npx hardhat node",
     "deploy-local": "npx hardhat run scripts/deploy.ts --network localhost",
+    "devnet": "npx hardhat run scripts/deploy.ts --network devnet",
     "local": "run-s node deploy-local",
     "circuits-local": "run-s circuits node deploy-local"
   },

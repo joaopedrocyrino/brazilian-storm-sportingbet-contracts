@@ -138,4 +138,28 @@ contract Bets {
 
         bet.claimed = true;
     }
+
+    function getMatch(uint256 matchId)
+        external
+        view
+        returns (
+            uint8,
+            uint16,
+            string memory,
+            string memory,
+            uint256,
+            bool
+        )
+    {
+        Match storage soccerMatch = matches[matchId];
+
+        return (
+            soccerMatch.round,
+            soccerMatch.season,
+            soccerMatch.house,
+            soccerMatch.visitor,
+            soccerMatch.limitTime,
+            soccerMatch.closed
+        );
+    }
 }

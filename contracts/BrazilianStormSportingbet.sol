@@ -288,4 +288,60 @@ contract BrazilianStormSportingbet is Users, Bets {
 
         changeBalance(input[0], input[1], input[2]);
     }
+
+    function fullfillMatchResult(
+        uint256 matchId,
+        uint8 house,
+        uint8 visitor
+    )
+        external
+        onlyCoordinator
+        returns (
+            WinnerBet[] memory,
+            GoalsBet[] memory,
+            ScoreBet[] memory
+        )
+    {
+        bool houseWins = house > visitor;
+
+        MatchBets storage matchBets = matches[matchId].bets;
+
+        WinnerBet[] memory winner = new WinnerBet[](
+            matchBets.winner.counter.current()
+        );
+
+        for (uint256 i = 0; i < matchBets.winner.counter.current(); i++) {
+            matchBets.winner.bets[i].bet.won =
+                matchBets.winner.bets[i].houseWins == houseWins;
+            winner[i] = matchBets.winner.bets[i];
+        }
+
+        GoalsBet[] memory goals = new GoalsBet[](
+            matchBets.goals.counter.current()
+        );
+
+        for (uint256 i = 0; i < matchBets.goals.counter.current(); i++) {
+            if (matchBets.goals.bets[i].house) {
+                matchBets.goals.bets[i].bet.won =
+                    matchBets.goals.bets[i].goals == house;
+            } else {
+                matchBets.goals.bets[i].bet.won =
+                    matchBets.goals.bets[i].goals == visitor;
+            }
+            goals[i] = matchBets.goals.bets[i];
+        }
+
+        ScoreBet[] memory score = new ScoreBet[](
+            matchBets.score.counter.current()
+        );
+
+        for (uint256 i = 0; i < matchBets.score.counter.current(); i++) {
+            matchBets.score.bets[i].bet.won =
+                matchBets.score.bets[i].house == house &&
+                matchBets.score.bets[i].visitor == visitor;
+            score[i] = matchBets.score.bets[i];
+        }
+
+        return (winner, goals, score);
+    }
 }

@@ -1,26 +1,18 @@
 import { ethers } from "hardhat";
-const { poseidonContract } = require("circomlibjs");
+import { genKeypair } from "../test/utils/encryption";
+// const { poseidonContract } = require("circomlibjs");
+const { buildEddsa } = require("circomlibjs");
 
 async function main() {
+  const eddsa = await buildEddsa();
+  const keyPair = await genKeypair(eddsa, "MY USERNAME", "MY PASSWORD");
+
   const DepositVerifier = await ethers.getContractFactory("DepositVerifier");
   const depositVerifier = await DepositVerifier.deploy();
 
   await depositVerifier.deployed();
 
   console.log("\nDeposit Verifier deployed to:", depositVerifier.address);
-
-  const MerkleTreeInclusionVerifier = await ethers.getContractFactory(
-    "MerkleTreeInclusionVerifier"
-  );
-  const merkleTreeInclusionVerifier =
-    await MerkleTreeInclusionVerifier.deploy();
-
-  await merkleTreeInclusionVerifier.deployed();
-
-  console.log(
-    "\nMerkle Tree Inclusion Verifier deployed to:",
-    merkleTreeInclusionVerifier.address
-  );
 
   const CreateUserVerifier = await ethers.getContractFactory(
     "CreateUserVerifier"
@@ -40,52 +32,42 @@ async function main() {
 
   console.log("\nWithdrawn Verifier deployed to:", withdrawnVerifier.address);
 
-  const PoseidonT3 = await ethers.getContractFactory(
-    poseidonContract.generateABI(2),
-    poseidonContract.createCode(2)
-  );
-  const poseidonT3 = await PoseidonT3.deploy();
-  await poseidonT3.deployed();
+  const MakeBetContract = await ethers.getContractFactory("MakeBetVerifier");
 
-  console.log("\nPoseidonT3 deployed to:", poseidonT3.address);
+  const betContract = await MakeBetContract.deploy();
+  await betContract.deployed();
 
-  const IncrementalBinaryTree = await ethers.getContractFactory(
-    "IncrementalBinaryTree",
-    {
-      libraries: {
-        PoseidonT3: poseidonT3.address,
-      },
-    }
-  );
-  const incrementalBinaryTree = await IncrementalBinaryTree.deploy();
-  await incrementalBinaryTree.deployed();
+  console.log("\nWMake Bet Contract deployed to:", betContract.address);
 
-  console.log(
-    "\nIncremental Binary Tree deployed to:",
-    incrementalBinaryTree.address
+  const ClaimBetContract = await ethers.getContractFactory("ClaimBetVerifier");
+
+  const claimBetContract = await ClaimBetContract.deploy();
+  await claimBetContract.deployed();
+
+  console.log("\nWClaim Bet Contract deployed to:", claimBetContract.address);
+
+  const BrazilianStorm = await ethers.getContractFactory(
+    "BrazilianStormSportingbet"
   );
 
-  const BrazilianStormSportingbet = await ethers.getContractFactory(
-    "BrazilianStormSportingbet",
-    {
-      libraries: {
-        IncrementalBinaryTree: incrementalBinaryTree.address,
-      },
-    }
-  );
-  const brazilianStormSportingbet = await BrazilianStormSportingbet.deploy(
-    depositVerifier.address,
-    merkleTreeInclusionVerifier.address,
+  const brazilianStormContract = await BrazilianStorm.deploy(
     createUserVerifier.address,
+    depositVerifier.address,
     withdrawnVerifier.address,
-    32
+    betContract.address,
+    claimBetContract.address,
+    [
+      // @ts-ignore
+      Array.from(keyPair.pubKey[0]),
+      // @ts-ignore
+      Array.from(keyPair.pubKey[1]),
+    ]
   );
-
-  await brazilianStormSportingbet.deployed();
+  await brazilianStormContract.deployed();
 
   console.log(
     "\nBrazilian Storm Sportingbet deployed to:",
-    brazilianStormSportingbet.address
+    brazilianStormContract.address
   );
 }
 

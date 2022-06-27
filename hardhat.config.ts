@@ -29,6 +29,10 @@ const config: HardhatUserConfig = {
       url: process.env.ROPSTEN_URL || "",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
+    devnet: {
+      url: `https://api.s0.ps.hmny.io`,
+      accounts: [`0x${process.env.HARMONY_PRIVATE_KEY}`],
+    },
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,

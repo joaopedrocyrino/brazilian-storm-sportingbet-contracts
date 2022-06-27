@@ -1,33 +1,26 @@
 import assert from "assert";
 import * as crypto from "crypto";
-// import * as ethers from "ethers";
-const {
-  buildBabyjub,
-  buildMimc7,
-  buildEddsa,
-  buildPoseidon,
-} = require("circomlibjs");
+const { buildBabyjub, buildPoseidon } = require("circomlibjs");
 
 const createBlakeHash = require("blake-hash");
-
 const ff = require("ffjavascript");
+const F1Field = require("ffjavascript").F1Field;
+const Scalar = require("ffjavascript").Scalar;
+
+export const SNARK_FIELD_SIZE = BigInt(
+  "21888242871839275222246405745257275088548364400416034343698204186575808495617"
+);
+exports.p = Scalar.fromString(SNARK_FIELD_SIZE.toString());
+
+export const Fr = new F1Field(exports.p);
 
 export type PrivKey = bigint;
 export type PubKey = Uint8Array[];
-export type EcdhSharedKey = Uint8Array;
-export type Plaintext = bigint[];
+export type EcdhSharedKey = bigint;
 
 export interface Keypair {
   privKey: PrivKey;
   pubKey: PubKey;
-}
-
-export interface Ciphertext {
-  // The initialisation vector
-  iv: bigint;
-
-  // The encrypted data
-  data: bigint[];
 }
 
 // An EdDSA signature.
@@ -46,21 +39,6 @@ export interface EdDSA {
     pubKey: PubKey
   ) => boolean;
 }
-
-export const SNARK_FIELD_SIZE = BigInt(
-  "21888242871839275222246405745257275088548364400416034343698204186575808495617"
-);
-
-/*
- * Convert a BigInt to a Buffer
- */
-export const bigInt2Buffer = (i: BigInt): Buffer => {
-  let hexStr = i.toString(16);
-  while (hexStr.length < 64) {
-    hexStr = "0" + hexStr;
-  }
-  return Buffer.from(hexStr, "hex");
-};
 
 /**
  * A TypedArray object describes an array-like view of an underlying binary data buffer.
@@ -94,28 +72,31 @@ export const buf2Bigint = (buf: ArrayBuffer | TypedArray | Buffer): bigint => {
   return ret;
 };
 
-export const sha512hex = (secret: string): string => {
-  return `0x${crypto.createHash("sha512").update(secret).digest("hex")}`;
+export const poseidonHash = async (elements: any[]) => {
+  const poseidon = await buildPoseidon();
+  const F = poseidon.F;
+
+  return F.toObject(poseidon(elements));
 };
 
-export const buildEddsaModule = async (): Promise<EdDSA> => {
-  return buildEddsa();
+export const sha512hex = async (secret: string): Promise<bigint> => {
+  return await poseidonHash([
+    `0x${crypto.createHash("sha512").update(secret).digest("hex")}`,
+  ]);
 };
 
-const genPrivKey = async (
+export const genPrivKey = async (
   username: string,
   password: string
 ): Promise<PrivKey> => {
-  const poseidon = await buildPoseidon();
+  const usernameHash = await sha512hex(username);
 
-  const usernameHash = poseidon([sha512hex(username)]);
+  const passwordHash = await sha512hex(password);
 
-  const passwordHash = poseidon([sha512hex(password)]);
-
-  return poseidon([usernameHash, passwordHash]);
+  return await poseidonHash([usernameHash, passwordHash]);
 };
 
-const formatPrivKey = (eddsa: any, privKey: PrivKey) => {
+export const formatPrivKey = (eddsa: any, privKey: PrivKey) => {
   const sBuff = eddsa.pruneBuffer(
     createBlakeHash("blake512")
       .update(Buffer.from(privKey.toString()))
@@ -126,17 +107,7 @@ const formatPrivKey = (eddsa: any, privKey: PrivKey) => {
   return ff.Scalar.shr(s, 3);
 };
 
-// const packPubKey = async (pubKey: PubKey): Promise<Buffer> => {
-//   const babyJub = await buildBabyjub();
-//   return babyJub.packPoint(pubKey);
-// };
-
-// const unpackPubKey = async (packed: Buffer): Promise<PubKey> => {
-//   const babyJub = await buildBabyjub();
-//   return babyJub.unpackPoint(packed);
-// };
-
-const genPubKey = (eddsa: EdDSA, privKey: PrivKey): Uint8Array[] => {
+export const genPubKey = (eddsa: EdDSA, privKey: PrivKey): Uint8Array[] => {
   assert(privKey < SNARK_FIELD_SIZE);
   return eddsa.prv2pub(privKey.toString());
 };
@@ -168,72 +139,8 @@ export const genEcdhSharedKey = async ({
   pubKey: PubKey;
 }): Promise<EcdhSharedKey> => {
   const babyJub = await buildBabyjub();
-  return babyJub.mulPointEscalar(pubKey, formatPrivKey(eddsa, privKey))[0];
-};
 
-/*
- * Encrypts a plaintext using a given key.
- */
-export const encrypt = async (
-  plaintext: Plaintext,
-  sharedKey: EcdhSharedKey
-): Promise<Ciphertext> => {
-  const mimc7 = await buildMimc7();
-
-  const iv = mimc7.getIV();
-
-  const ciphertext: Ciphertext = {
-    iv,
-    data: plaintext.map((e: bigint, i: number): bigint => {
-      return e + buf2Bigint(mimc7.hash(sharedKey, iv + BigInt(i)));
-    }),
-  };
-
-  return ciphertext;
-};
-
-/*
- * Decrypts a ciphertext using a given key.
- * @return The plaintext.
- */
-export const decrypt = async (
-  ciphertext: Ciphertext,
-  sharedKey: EcdhSharedKey
-): Promise<Plaintext> => {
-  const mimc7 = await buildMimc7();
-
-  const plaintext: Plaintext = ciphertext.data.map(
-    (e: bigint, i: number): bigint => {
-      return e - buf2Bigint(mimc7.hash(sharedKey, ciphertext.iv + BigInt(i)));
-    }
+  return buf2Bigint(
+    babyJub.mulPointEscalar(pubKey, formatPrivKey(eddsa, privKey))[0]
   );
-
-  return plaintext;
 };
-
-// export {
-//   buildEddsaModule,
-//   buf2Bigint,
-//   genPrivKey,
-//   genPubKey,
-//   genKeypair,
-//   genEcdhSharedKey,
-//   encrypt,
-//   decrypt,
-//   Signature,
-//   PrivKey,
-//   PubKey,
-//   Keypair,
-//   EcdhSharedKey,
-//   EdDSA,
-//   Ciphertext,
-//   Plaintext,
-//   TypedArray,
-//   //   formatPrivKeyForBabyJub,
-//   //   NOTHING_UP_MY_SLEEVE,
-//   //   NOTHING_UP_MY_SLEEVE_PUBKEY,
-//   SNARK_FIELD_SIZE,
-//   bigInt2Buffer,
-//   //   packPubKey,
-//   //   unpackPubKey,
-// };
