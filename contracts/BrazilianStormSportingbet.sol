@@ -1,21 +1,16 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.4;
+pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 
-import "./Users.sol";
 import "./Bets.sol";
 
-import "./interfaces/IMakeBetVerifier.sol";
-import "./interfaces/IClaimBetVerifier.sol";
-
-contract BrazilianStormSportingbet is Users, Bets {
+contract BrazilianStormSportingbet is Bets {
     using Counters for Counters.Counter;
 
     address private coordinator;
     uint8[32][2] public coordinatorPubKey;
-
-    IMakeBetVerifier private betVerifier;
 
     constructor(
         address _createUserVerifier,
@@ -25,11 +20,14 @@ contract BrazilianStormSportingbet is Users, Bets {
         address _claimBetVerifier,
         uint8[32][2] memory _coordinatorPubKey
     )
-        Users(_createUserVerifier, _depositVerifier, _withdrawnVerifier)
-        Bets(_claimBetVerifier)
+        Bets(
+            _betVerifier,
+            _claimBetVerifier,
+            _createUserVerifier,
+            _depositVerifier,
+            _withdrawnVerifier
+        )
     {
-        betVerifier = IMakeBetVerifier(_betVerifier);
-
         coordinator = msg.sender;
         coordinatorPubKey = _coordinatorPubKey;
     }
@@ -39,85 +37,164 @@ contract BrazilianStormSportingbet is Users, Bets {
         _;
     }
 
-    function createMatch(
-        uint8 round,
-        uint16 season,
-        string memory house,
-        string memory visitor,
-        uint256 limitTime
-    ) external onlyCoordinator {
-        Match storage newMatch = matches[_matchIds.current()];
+    /// @dev coordinator functions
 
-        newMatch.id = _matchIds.current();
-        newMatch.season = season;
-        newMatch.round = round;
-        newMatch.house = house;
-        newMatch.visitor = visitor;
-        newMatch.limitTime = limitTime;
+    function insertChampionships(ChampionshipFields[] memory champs)
+        external
+        onlyCoordinator
+    {
+         for (uint256 i = 0; i < champs.length; i++) {
+            Championship storage champ = championships[champIds.current()];
 
-        emit MatchCreated(_matchIds.current(), season, round, house, visitor);
+            champ.name = champs[i].name;
+            champ.season = champs[i].season;
+            champ.country = champs[i].country;
 
-        _matchIds.increment();
+            emit ChampionshipInserted(
+                champIds.current(),
+                champs[i].name,
+                champs[i].season,
+                champs[i].country
+            );
+
+            champIds.increment();
+        }
     }
+
+    function insertMatches(uint256 champId, Match[] memory matches)
+        external
+        onlyCoordinator
+    {
+        Championship storage champ = championships[champId];
+
+        for (uint256 i = 0; i < matches.length; i++) {
+            champ.matches[champ.matchIds.current()].start = matches[i].start;
+            champ.matches[champ.matchIds.current()].house = matches[i].house;
+            champ.matches[champ.matchIds.current()].visitor = matches[i]
+                .visitor;
+
+            emit MatchInserted(
+                champ.matchIds.current(),
+                champId,
+                matches[i].house,
+                matches[i].visitor
+            );
+
+            champ.matchIds.increment();
+        }
+    }
+
+    function closeChampionship(uint256 champId) external onlyCoordinator {
+        Championship storage champ = championships[champId];
+        champ.closed = true;
+
+        if (champId <= openChampionshipIndex) {
+            openChampionshipIndex = champId + 1;
+        }
+    }
+
+    function closeMatches(CloseMatches[] memory matchesToClose)
+        external
+        onlyCoordinator
+    {
+        for (uint256 i = 0; i < matchesToClose.length; i++) {
+            Championship storage champ = championships[
+                matchesToClose[i].champId
+            ];
+            Match storage soccerMatch = champ.matches[
+                matchesToClose[i].matchId
+            ];
+            require(soccerMatch.resultsFullfilled, "No results yet");
+
+            MatchBets storage bets = champ.matchBets[matchesToClose[i].matchId];
+
+            bets.winner.totalLostValue = matchesToClose[i].winnerTotalLostValue;
+            bets.winner.multiplier = matchesToClose[i].winnerMultiplier;
+
+            bets.score.totalLostValue = matchesToClose[i].scoreTotalLostValue;
+            bets.score.multiplier = matchesToClose[i].scoreMultiplier;
+
+            bets.goals.totalLostValue = matchesToClose[i].goalsTotalLostValue;
+            bets.goals.multiplier = matchesToClose[i].goalsMultiplier;
+
+            soccerMatch.closed = true;
+
+            if (matchesToClose[i].matchId <= champ.openMatchIndex) {
+                champ.openMatchIndex = matchesToClose[i].matchId + 1;
+            }
+        }
+    }
+
+    function fullfillResults(Fullfill[] memory results)
+        external
+        onlyCoordinator
+        returns (BetValues[] memory)
+    {
+        BetValues[] memory betValues = new BetValues[](results.length);
+
+        for (uint256 i = 0; i < results.length; i++) {
+            Championship storage champ = championships[results[i].champId];
+            Match storage soccerMatch = champ.matches[results[i].matchId];
+
+            require(!soccerMatch.resultsFullfilled, "already fullfilled");
+
+            soccerMatch.houseGoals = results[i].house;
+            soccerMatch.visitorGoals = results[i].visitor;
+
+            soccerMatch.resultsFullfilled = true;
+
+            MatchBets storage bets = champ.matchBets[results[i].matchId];
+
+            WinnerBet[] memory winnerBets = new WinnerBet[](
+                bets.winner.counter.current()
+            );
+
+            GoalsBet[] memory goalsBets = new GoalsBet[](
+                bets.goals.counter.current()
+            );
+
+            ScoreBet[] memory scoreBets = new ScoreBet[](
+                bets.score.counter.current()
+            );
+
+            betValues[i] = BetValues(
+                results[i].matchId,
+                results[i].champId,
+                scoreBets,
+                winnerBets,
+                goalsBets,
+                results[i].house,
+                results[i].visitor
+            );
+        }
+
+        return betValues;
+    }
+
+    /// @dev user functions 
+
+    function createUser (
+        uint256[2] memory a,
+        uint256[2][2] memory b,
+        uint256[2] memory c,
+        uint256[3] memory input,
+        uint8[32][2] memory pubKey
+    ) external {
+        _createUser(a, b, c, input, pubKey);
+    }
+
+    /// @dev bet functions
 
     function betWinner(
         uint256[2] memory a,
         uint256[2][2] memory b,
         uint256[2] memory c,
         uint256[4] memory input,
+        uint256 champId,
         uint256 matchId,
-        bool houseWins
+        bool house
     ) external {
-        bool isValidProof = betVerifier.verifyProof(a, b, c, input);
-
-        require(isValidProof, "Invalid proof");
-
-        changeBalance(input[0], input[1], input[2]);
-
-        WinnerBets storage matchWinnerBets = matches[matchId].bets.winner;
-
-        WinnerBet storage bet = matchWinnerBets.bets[
-            matchWinnerBets.counter.current()
-        ];
-
-        bet.houseWins = houseWins;
-
-        bet.bet.id = matchWinnerBets.counter.current();
-        bet.bet.better = input[0];
-        bet.bet.value = input[3];
-
-        matchWinnerBets.counter.increment();
-    }
-
-    function betGoals(
-        uint256[2] memory a,
-        uint256[2][2] memory b,
-        uint256[2] memory c,
-        uint256[4] memory input,
-        uint256 matchId,
-        bool house,
-        uint8 goals
-    ) external {
-        bool isValidProof = betVerifier.verifyProof(a, b, c, input);
-
-        require(isValidProof, "Invalid proof");
-
-        changeBalance(input[0], input[1], input[2]);
-
-        GoalsBets storage matchGoalsBets = matches[matchId].bets.goals;
-
-        GoalsBet storage bet = matchGoalsBets.bets[
-            matchGoalsBets.counter.current()
-        ];
-
-        bet.house = house;
-        bet.goals = goals;
-
-        bet.bet.id = matchGoalsBets.counter.current();
-        bet.bet.better = input[0];
-        bet.bet.value = input[3];
-
-        matchGoalsBets.counter.increment();
+        _insertWinnerBet(a, b, c, input, champId, matchId, house);
     }
 
     function betScore(
@@ -125,223 +202,84 @@ contract BrazilianStormSportingbet is Users, Bets {
         uint256[2][2] memory b,
         uint256[2] memory c,
         uint256[4] memory input,
+        uint256 champId,
         uint256 matchId,
         uint8 house,
         uint8 visitor
     ) external {
-        bool isValidProof = betVerifier.verifyProof(a, b, c, input);
-
-        require(isValidProof, "Invalid proof");
-
-        changeBalance(input[0], input[1], input[2]);
-
-        ScoreBets storage matchScoreBets = matches[matchId].bets.score;
-
-        ScoreBet storage bet = matchScoreBets.bets[
-            matchScoreBets.counter.current()
-        ];
-
-        bet.house = house;
-        bet.visitor = visitor;
-
-        bet.bet.id = matchScoreBets.counter.current();
-        bet.bet.better = input[0];
-        bet.bet.value = input[3];
-
-        matchScoreBets.counter.increment();
+        _insertScoreBet(a, b, c, input, champId, matchId, house, visitor);
     }
 
-    function getAllMatchBets(uint256 matchId)
+    function betGoals(
+        uint256[2] memory a,
+        uint256[2][2] memory b,
+        uint256[2] memory c,
+        uint256[4] memory input,
+        uint256 champId,
+        uint256 matchId,
+        bool house,
+        uint8 goals
+    ) external {
+        _insertGoalsBet(a, b, c, input, champId, matchId, house, goals);
+    }
+
+    /// @dev claim bet functions
+
+    function claimWinnerBet(
+        uint256[2] memory a,
+        uint256[2][2] memory b,
+        uint256[2] memory c,
+        uint256[5] memory input,
+        uint256 champId,
+        uint256 matchId,
+        uint256 betId
+    ) external {
+        _claimWinnerBet(a, b, c, input, champId, matchId, betId);
+    }
+
+    function claimGoalsBet(
+        uint256[2] memory a,
+        uint256[2][2] memory b,
+        uint256[2] memory c,
+        uint256[5] memory input,
+        uint256 champId,
+        uint256 matchId,
+        uint256 betId
+    ) external {
+        _claimGoalsBet(a, b, c, input, champId, matchId, betId);
+    }
+
+    function claimScoreBet(
+        uint256[2] memory a,
+        uint256[2][2] memory b,
+        uint256[2] memory c,
+        uint256[5] memory input,
+        uint256 champId,
+        uint256 matchId,
+        uint256 betId
+    ) external {
+        _claimScoreBet(a, b, c, input, champId, matchId, betId);
+    }
+
+    /// @dev query data functions
+
+    function getChampionships()
         external
         view
-        onlyCoordinator
-        returns (
-            WinnerBet[] memory,
-            GoalsBet[] memory,
-            ScoreBet[] memory
-        )
+        returns (ChampionshipFields[] memory)
     {
-        MatchBets storage matchBets = matches[matchId].bets;
+        ChampionshipFields[] memory champs = _getChampionships();
 
-        WinnerBet[] memory winner = new WinnerBet[](
-            matchBets.winner.counter.current()
-        );
-
-        for (uint256 i = 0; i < matchBets.winner.counter.current(); i++) {
-            winner[i] = matchBets.winner.bets[i];
-        }
-
-        GoalsBet[] memory goals = new GoalsBet[](
-            matchBets.goals.counter.current()
-        );
-
-        for (uint256 i = 0; i < matchBets.goals.counter.current(); i++) {
-            goals[i] = matchBets.goals.bets[i];
-        }
-
-        ScoreBet[] memory score = new ScoreBet[](
-            matchBets.score.counter.current()
-        );
-
-        for (uint256 i = 0; i < matchBets.score.counter.current(); i++) {
-            score[i] = matchBets.score.bets[i];
-        }
-
-        return (winner, goals, score);
+        return champs;
     }
 
-    function closeMatchBets(
-        uint256 matchId,
-        uint256 scoreLostValue,
-        uint256 goalsLostValue,
-        uint256 winnerLostValue,
-        uint16 scoreMultiplier,
-        uint16 goalsMultiplier,
-        uint16 winnerMultiplier
-    ) external payable onlyCoordinator {
-        Match storage soccerMatch = matches[matchId];
-
-        uint256 winnerValue = (winnerLostValue * 90) / 100;
-        uint256 scoreValue = (scoreLostValue * 90) / 100;
-        uint256 goalsValue = (goalsLostValue * 90) / 100;
-
-        uint256 coordinatorFee = (winnerLostValue - winnerValue) +
-            (scoreLostValue - scoreValue) +
-            (goalsLostValue - goalsValue);
-
-        soccerMatch.bets.winner.betValues.lostBetsValue = winnerValue;
-        soccerMatch.bets.winner.betValues.returnMultiplier = winnerMultiplier;
-
-        soccerMatch.bets.goals.betValues.lostBetsValue = goalsValue;
-        soccerMatch.bets.goals.betValues.returnMultiplier = goalsMultiplier;
-
-        soccerMatch.bets.score.betValues.lostBetsValue = scoreValue;
-        soccerMatch.bets.score.betValues.returnMultiplier = scoreMultiplier;
-
-        soccerMatch.closed = true;
-
-        payable(coordinator).transfer(coordinatorFee);
-    }
-
-    function claimBetWinner(
-        uint256[2] memory a,
-        uint256[2][2] memory b,
-        uint256[2] memory c,
-        uint256[5] memory input,
-        uint256 matchId,
-        uint256 betId
-    ) external {
-        WinnerBets storage bets = matches[matchId].bets.winner;
-
-        claimBet(
-            a,
-            b,
-            c,
-            input,
-            bets.bets[betId].bet,
-            bets.betValues.returnMultiplier
-        );
-
-        changeBalance(input[0], input[1], input[2]);
-    }
-
-    function claimBetScore(
-        uint256[2] memory a,
-        uint256[2][2] memory b,
-        uint256[2] memory c,
-        uint256[5] memory input,
-        uint256 matchId,
-        uint256 betId
-    ) external {
-        ScoreBets storage bets = matches[matchId].bets.score;
-
-        claimBet(
-            a,
-            b,
-            c,
-            input,
-            bets.bets[betId].bet,
-            bets.betValues.returnMultiplier
-        );
-
-        changeBalance(input[0], input[1], input[2]);
-    }
-
-    function claimBetGoals(
-        uint256[2] memory a,
-        uint256[2][2] memory b,
-        uint256[2] memory c,
-        uint256[5] memory input,
-        uint256 matchId,
-        uint256 betId
-    ) external {
-        GoalsBets storage bets = matches[matchId].bets.goals;
-
-        claimBet(
-            a,
-            b,
-            c,
-            input,
-            bets.bets[betId].bet,
-            bets.betValues.returnMultiplier
-        );
-
-        changeBalance(input[0], input[1], input[2]);
-    }
-
-    function fullfillMatchResult(
-        uint256 matchId,
-        uint8 house,
-        uint8 visitor
-    )
+    function getMatches(uint256 champId)
         external
-        onlyCoordinator
-        returns (
-            WinnerBet[] memory,
-            GoalsBet[] memory,
-            ScoreBet[] memory
-        )
+        view
+        returns (Match[] memory)
     {
-        bool houseWins = house > visitor;
+        Match[] memory matches = _getMatches(champId);
 
-        MatchBets storage matchBets = matches[matchId].bets;
-
-        WinnerBet[] memory winner = new WinnerBet[](
-            matchBets.winner.counter.current()
-        );
-
-        for (uint256 i = 0; i < matchBets.winner.counter.current(); i++) {
-            matchBets.winner.bets[i].bet.won =
-                matchBets.winner.bets[i].houseWins == houseWins;
-            winner[i] = matchBets.winner.bets[i];
-        }
-
-        GoalsBet[] memory goals = new GoalsBet[](
-            matchBets.goals.counter.current()
-        );
-
-        for (uint256 i = 0; i < matchBets.goals.counter.current(); i++) {
-            if (matchBets.goals.bets[i].house) {
-                matchBets.goals.bets[i].bet.won =
-                    matchBets.goals.bets[i].goals == house;
-            } else {
-                matchBets.goals.bets[i].bet.won =
-                    matchBets.goals.bets[i].goals == visitor;
-            }
-            goals[i] = matchBets.goals.bets[i];
-        }
-
-        ScoreBet[] memory score = new ScoreBet[](
-            matchBets.score.counter.current()
-        );
-
-        for (uint256 i = 0; i < matchBets.score.counter.current(); i++) {
-            matchBets.score.bets[i].bet.won =
-                matchBets.score.bets[i].house == house &&
-                matchBets.score.bets[i].visitor == visitor;
-            score[i] = matchBets.score.bets[i];
-        }
-
-        return (winner, goals, score);
+        return matches;
     }
 }

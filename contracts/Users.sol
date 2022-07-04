@@ -40,13 +40,25 @@ contract Users {
 
     event UserCreated(uint256 identityCommitment, uint8[32][2] pubKey);
 
-    function createUser(
+    function _changeBalance(
+        uint256 identityCommitment,
+        uint256 currentBalance,
+        uint256 newBalance
+    ) internal {
+        User storage user = users[identityCommitment];
+
+        require(user.balance == currentBalance, "Invalid current balance");
+
+        user.balance = newBalance;
+    }
+
+    function _createUser(
         uint256[2] memory a,
         uint256[2][2] memory b,
         uint256[2] memory c,
         uint256[3] memory input,
         uint8[32][2] memory pubKey
-    ) external {
+    ) internal {
         bool isValidProof = createUserVerifier.verifyProof(a, b, c, input);
 
         require(isValidProof, "Invalid proof");
@@ -96,17 +108,5 @@ contract Users {
         user.balance = input[2];
 
         payable(msg.sender).transfer(input[3]);
-    }
-
-    function changeBalance(
-        uint256 identityCommitment,
-        uint256 currentBalance,
-        uint256 newBalance
-    ) internal {
-        User storage user = users[identityCommitment];
-
-        require(user.balance == currentBalance, "Invalid current balance");
-
-        user.balance = newBalance;
     }
 }

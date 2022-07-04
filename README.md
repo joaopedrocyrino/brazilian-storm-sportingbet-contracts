@@ -23,11 +23,10 @@ https://youtu.be -->
 
 ## Project Structure
 
-The project has three main folders:
+The project has two main folders:
 
 - circuits
 - contracts
-- zkgames-ui
 
 ### circuits
 
