@@ -1,11 +1,15 @@
+import * as dotenv from "dotenv";
 import { ethers } from "hardhat";
 import { genKeypair } from "../test/utils/encryption";
-// const { poseidonContract } = require("circomlibjs");
 const { buildEddsa } = require("circomlibjs");
 
 async function main() {
   const eddsa = await buildEddsa();
-  const keyPair = await genKeypair(eddsa, "MY USERNAME", "MY PASSWORD");
+  const keyPair = await genKeypair(
+    eddsa,
+    process.env.COORDINATOR_USERNAME || "",
+    process.env.COORDINATOR_PASSWORD || ""
+  );
 
   const DepositVerifier = await ethers.getContractFactory("DepositVerifier");
   const depositVerifier = await DepositVerifier.deploy();
@@ -54,8 +58,6 @@ async function main() {
     createUserVerifier.address,
     depositVerifier.address,
     withdrawnVerifier.address,
-    betContract.address,
-    claimBetContract.address,
     [
       // @ts-ignore
       Array.from(keyPair.pubKey[0]),
@@ -63,94 +65,33 @@ async function main() {
       Array.from(keyPair.pubKey[1]),
     ]
   );
+
   await brazilianStormContract.deployed();
 
-  // const now = new Date().getTime();
-
-  // await brazilianStormContract.createMatch(
-  //   15,
-  //   2022,
-  //   "JUV",
-  //   "CAM",
-  //   now + 604800
-  // );
-
-  // await brazilianStormContract.createMatch(
-  //   15,
-  //   2022,
-  //   "FLU",
-  //   "CTH",
-  //   now + 604800
-  // );
-
-  // await brazilianStormContract.createMatch(
-  //   15,
-  //   2022,
-  //   "SNT",
-  //   "FLA",
-  //   now + 604800
-  // );
-
-  // await brazilianStormContract.createMatch(
-  //   15,
-  //   2022,
-  //   "PAL",
-  //   "APR",
-  //   now + 604800
-  // );
-
-  // await brazilianStormContract.createMatch(
-  //   15,
-  //   2022,
-  //   "AGO",
-  //   "SAO",
-  //   now + 604800
-  // );
-
-  // await brazilianStormContract.createMatch(
-  //   15,
-  //   2022,
-  //   "COR",
-  //   "FOR",
-  //   now + 604800
-  // );
-
-  // await brazilianStormContract.createMatch(
-  //   15,
-  //   2022,
-  //   "CEA",
-  //   "INT",
-  //   now + 604800
-  // );
-
-  // await brazilianStormContract.createMatch(
-  //   15,
-  //   2022,
-  //   "AVA",
-  //   "CUI",
-  //   now + 604800
-  // );
-
-  // await brazilianStormContract.createMatch(
-  //   15,
-  //   2022,
-  //   "AMG",
-  //   "GOS",
-  //   now + 604800
-  // );
-
-  // await brazilianStormContract.createMatch(
-  //   15,
-  //   2022,
-  //   "BRG",
-  //   "BTF",
-  //   now + 604800
-  // );
-
   console.log(
-    "\nBrazilian Storm Sportingbet deployed to:",
+    "\brazilianStormContract deployed to:",
     brazilianStormContract.address
   );
+
+  const Matches = await ethers.getContractFactory("Matches");
+
+  const matchesContract = await Matches.deploy();
+
+  console.log("\nMatches deployed to:", matchesContract.address);
+
+  const Bet = await ethers.getContractFactory("Bets");
+
+  const betsContract = await Bet.deploy(
+    betContract.address,
+    claimBetContract.address,
+    brazilianStormContract.address,
+    matchesContract.address
+  );
+
+  console.log("\nBet deployed to:", betsContract.address);
+
+  brazilianStormContract.setContractAdresses(betsContract.address);
+  matchesContract.setContractAdresses(betsContract.address);
 }
 
 main().catch((error) => {

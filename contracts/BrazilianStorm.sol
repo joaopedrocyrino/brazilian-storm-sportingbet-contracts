@@ -1,38 +1,43 @@
 //SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.4;
+pragma experimental ABIEncoderV2;
+
+import "@openzeppelin/contracts/utils/Counters.sol";
 
 import "./interfaces/ICreateUserVerifier.sol";
 import "./interfaces/IDepositVerifier.sol";
 import "./interfaces/IWithdrawnVerifier.sol";
 
-contract Users {
+contract BrazilianStormSportingbet {
+    using Counters for Counters.Counter;
+
     struct User {
-        /// @dev user balance encrypted using user's identity
         uint256 balance;
-        /// @dev used to generate shared secret between coordinator and user
         uint8[32][2] pubKey;
-        /// @dev used to check if user actually exists or if its default value
         bool isActive;
     }
 
-    /// @dev username hash => bool already in use
     mapping(uint256 => bool) public usernames;
-
-    /// @dev identity commitment => user
     mapping(uint256 => User) public users;
 
-    /// @dev zero knowledge verifier on create user
+    address private coordinator;
+    uint8[32][2] public coordinatorPubKey;
+
     ICreateUserVerifier private createUserVerifier;
-    /// @dev zero knowledge verifier on deposit funds
     IDepositVerifier private depositVerifier;
-    /// @dev zero knowledge verifier on withdrawn funds
     IWithdrawnVerifier private withdrawnVerifier;
+
+    address private betContract;
 
     constructor(
         address _createUserVerifier,
         address _depositVerifier,
-        address _withdrawnVerifier
+        address _withdrawnVerifier,
+        uint8[32][2] memory _coordinatorPubKey
     ) {
+        coordinator = msg.sender;
+        coordinatorPubKey = _coordinatorPubKey;
+
         createUserVerifier = ICreateUserVerifier(_createUserVerifier);
         depositVerifier = IDepositVerifier(_depositVerifier);
         withdrawnVerifier = IWithdrawnVerifier(_withdrawnVerifier);
@@ -40,25 +45,30 @@ contract Users {
 
     event UserCreated(uint256 identityCommitment, uint8[32][2] pubKey);
 
-    function _changeBalance(
-        uint256 identityCommitment,
-        uint256 currentBalance,
-        uint256 newBalance
-    ) internal {
-        User storage user = users[identityCommitment];
-
-        require(user.balance == currentBalance, "Invalid current balance");
-
-        user.balance = newBalance;
+    modifier onlyCoordinator() {
+        require(msg.sender == coordinator, "Only coordinator allowed");
+        _;
     }
 
-    function _createUser(
+    modifier onlyContracts() {
+        require(msg.sender == betContract, "Only contracts allowed");
+        _;
+    }
+
+    function setContractAdresses(address _betContract)
+        external
+        onlyCoordinator
+    {
+        betContract = _betContract;
+    }
+
+    function createUser(
         uint256[2] memory a,
         uint256[2][2] memory b,
         uint256[2] memory c,
         uint256[3] memory input,
         uint8[32][2] memory pubKey
-    ) internal {
+    ) external {
         bool isValidProof = createUserVerifier.verifyProof(a, b, c, input);
 
         require(isValidProof, "Invalid proof");
@@ -108,5 +118,21 @@ contract Users {
         user.balance = input[2];
 
         payable(msg.sender).transfer(input[3]);
+    }
+
+    function changeBalance(
+        uint256 identityCommitment,
+        uint256 currentBalance,
+        uint256 newBalance
+    ) external onlyContracts {
+        User storage user = users[identityCommitment];
+
+        require(user.balance == currentBalance, "Invalid current balance");
+
+        user.balance = newBalance;
+    }
+
+    function payCoordinator(uint256 fee) external payable onlyContracts {
+        payable(coordinator).transfer(fee);
     }
 }
