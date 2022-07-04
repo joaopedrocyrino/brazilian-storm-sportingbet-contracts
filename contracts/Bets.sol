@@ -387,4 +387,31 @@ contract Bets is Dto {
 
         brazilianStorm.payCoordinator(coordinatorFee);
     }
+
+    function getWinnerBet(
+        uint256 champId,
+        uint256 matchId,
+        uint256 betId
+    ) external view returns (WinnerBet memory) {
+        WinnerBet memory winner = bets[champId][matchId].winner.bets[betId];
+        return winner;
+    }
+
+    function getScoreBet(
+        uint256 champId,
+        uint256 matchId,
+        uint256 betId
+    ) external view returns (ScoreBet memory) {
+        ScoreBet memory score = bets[champId][matchId].score.bets[betId];
+        return score;
+    }
+
+    function getGoalsBet(
+        uint256 champId,
+        uint256 matchId,
+        uint256 betId
+    ) external view returns (GoalsBet memory) {
+        GoalsBet memory goals = bets[champId][matchId].goals.bets[betId];
+        return goals;
+    }
 }

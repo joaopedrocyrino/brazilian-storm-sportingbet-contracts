@@ -29,6 +29,10 @@ const config: HardhatUserConfig = {
       url: `https://api.s0.ps.hmny.io`,
       accounts: [`0x${process.env.HARMONY_DEVNET_PRIVATE_KEY}`],
     },
+    harmony: {
+      url: `https://api.harmony.one`,
+      accounts: [`0x${process.env.HARMONY_MAINNET_PRIVATE_KEY}`],
+    },
   },
 };
 
