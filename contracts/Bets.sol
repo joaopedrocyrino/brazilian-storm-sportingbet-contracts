@@ -9,9 +9,9 @@ import "./interfaces/IMakeBetVerifier.sol";
 import "./interfaces/IBrazilianStorm.sol";
 import "./interfaces/IMatches.sol";
 
-import "./Dto.sol";
+import "./Matches.sol";
 
-contract Bets is Dto {
+contract Bets {
     using Counters for Counters.Counter;
 
     struct WinnerBet {
@@ -89,12 +89,33 @@ contract Bets is Dto {
         matchesAddress = _matchContract;
     }
 
-    event BetInserted(
+    event WinnerBetInserted(
         uint256 id,
         uint256 champId,
         uint256 matchId,
         uint256 better,
-        string betType
+        uint256 value,
+        bool house
+    );
+
+    event GoalsBetInserted(
+        uint256 id,
+        uint256 champId,
+        uint256 matchId,
+        uint256 better,
+        uint256 value,
+        bool house,
+        uint8 goals
+    );
+
+    event ScoreBetInserted(
+        uint256 id,
+        uint256 champId,
+        uint256 matchId,
+        uint256 better,
+        uint256 value,
+        uint8 house,
+        uint8 visitor
     );
 
     function _bet(
@@ -108,7 +129,7 @@ contract Bets is Dto {
         bool isValidProof = betVerifier.verifyProof(a, b, c, input);
         require(isValidProof, "Invalid proof");
 
-        Match memory soccerMatch = matches.getMatch(champId, matchId);
+        Matches.Match memory soccerMatch = matches.getMatch(champId, matchId);
 
         require(
             block.timestamp + 3600 <= soccerMatch.start,
@@ -138,12 +159,13 @@ contract Bets is Dto {
             false
         );
 
-        emit BetInserted(
+        emit WinnerBetInserted(
             winnerBets.counter.current(),
             champId,
             matchId,
             input[0],
-            "winner"
+            input[3],
+            house
         );
 
         winnerBets.counter.increment();
@@ -171,12 +193,14 @@ contract Bets is Dto {
             false
         );
 
-        emit BetInserted(
+        emit ScoreBetInserted(
             scoreBets.counter.current(),
             champId,
             matchId,
             input[0],
-            "score"
+            input[3],
+            house,
+            visitor
         );
 
         scoreBets.counter.increment();
@@ -204,12 +228,14 @@ contract Bets is Dto {
             false
         );
 
-        emit BetInserted(
+        emit GoalsBetInserted(
             goalsBets.counter.current(),
             champId,
             matchId,
             input[0],
-            "goals"
+            input[3],
+            house,
+            goals
         );
 
         goalsBets.counter.increment();
@@ -227,7 +253,7 @@ contract Bets is Dto {
         bool isValidProof = claimBetVerifier.verifyProof(a, b, c, input);
         require(isValidProof, "Invalid proof");
 
-        Match memory soccerMatch = matches.getMatch(champId, matchId);
+        Matches.Match memory soccerMatch = matches.getMatch(champId, matchId);
         require(soccerMatch.closed, "Coordinator needs to close match");
 
         WinnerBets storage winnerBets = bets[champId][matchId].winner;
@@ -267,7 +293,7 @@ contract Bets is Dto {
         bool isValidProof = claimBetVerifier.verifyProof(a, b, c, input);
         require(isValidProof, "Invalid proof");
 
-        Match memory soccerMatch = matches.getMatch(champId, matchId);
+        Matches.Match memory soccerMatch = matches.getMatch(champId, matchId);
         require(soccerMatch.closed, "Coordinator needs to close match");
 
         ScoreBets storage scoreBets = bets[champId][matchId].score;
@@ -305,7 +331,7 @@ contract Bets is Dto {
         bool isValidProof = claimBetVerifier.verifyProof(a, b, c, input);
         require(isValidProof, "Invalid proof");
 
-        Match memory soccerMatch = matches.getMatch(champId, matchId);
+        Matches.Match memory soccerMatch = matches.getMatch(champId, matchId);
         require(soccerMatch.closed, "Coordinator needs to close match");
 
         GoalsBets storage goalsBets = bets[champId][matchId].goals;
@@ -336,7 +362,7 @@ contract Bets is Dto {
         view
         returns (MatchBetsValues memory)
     {
-        Match memory soccerMatch = matches.getMatch(champId, matchId);
+        Matches.Match memory soccerMatch = matches.getMatch(champId, matchId);
         require(soccerMatch.resultsFullfilled, "No results yet");
 
         MatchBets storage matchBets = bets[champId][matchId];
@@ -368,7 +394,7 @@ contract Bets is Dto {
         return (MatchBetsValues(winnerBets, scoreBets, goalsBets));
     }
 
-    function closeMatches(CloseMatches[] memory matchesToClose) external {
+    function closeMatches(Matches.CloseMatches[] memory matchesToClose) external {
         require(msg.sender == matchesAddress, "only match contract");
 
         uint256 coordinatorFee = 0;
